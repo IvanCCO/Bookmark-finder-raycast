@@ -13,7 +13,8 @@ const FIELDS = {
 const RULES = `Para cada link salvo, escreva em português do Brasil:
 - description: 1 ou 2 frases curtas (máx. 30 palavras) dizendo o que é e para que serve. Use a descrição da página quando existir.
 - keywords: 6 a 10 palavras-chave separadas por vírgula, com sinônimos e termos em inglês que alguém usaria para procurar o link.
-- clear: true se título, URL e descrição bastam para saber do que se trata; false se você estaria chutando (página privada, título genérico). Nunca invente.`;
+- clear: true se título, URL e descrição bastam para saber do que se trata; false se você estaria chutando (página privada, título genérico). Nunca invente.
+A description descreve só o que o link é; nunca comente falta de informação (nada de "o título não esclarece"). Se não souber, diga apenas o que dá para ver (ex.: "Documento PDF.") e marque clear = false.`;
 
 function describeInput(link, index) {
   const meta = link.meta?.status === "ok" ? ` | descrição da página: ${link.meta.description || "-"} | site: ${link.meta.siteName || "-"}` : " | página privada ou inacessível";
