@@ -6,6 +6,7 @@ import { readJson, writeJson, linkId } from "../store.mjs";
 import { fetchMetadataMany } from "./metadata.mjs";
 import { describeLinks } from "./describe.mjs";
 import { assignCategories, proposeCategories } from "./categorize.mjs";
+import { pruneOverrides, readOverrides } from "../overrides.mjs";
 
 export const syncState = { running: false, lastRun: null, lastResult: null };
 let inFlight = null;
@@ -61,6 +62,7 @@ async function syncOnce({ recluster, regenerate }) {
   }
 
   writeJson("links.json", links);
+  if (removed > 0) writeJson("overrides.json", pruneOverrides(readOverrides(), byId.keys()));
   return { total: links.length, added, removed, errors: [...errors, ...aiErrors] };
 }
 

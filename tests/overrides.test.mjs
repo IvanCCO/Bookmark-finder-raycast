@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { renameCategory, toPublicLink } from "../server/overrides.mjs";
+import { pruneOverrides, renameCategory, toPublicLink } from "../server/overrides.mjs";
 
 const link = { id: "a", title: "T", url: "https://a.com", description: "IA", category: "Educação", clear: false };
 
@@ -36,4 +36,9 @@ test("renomear para uma categoria que já existe mescla as duas", () => {
   renameCategory("A", "B", state);
   assert.deepEqual(state.categories.map((c) => c.name), ["B"]);
   assert.equal(state.links[0].category, "B");
+});
+
+test("edições de links removidos do navegador são descartadas", () => {
+  const overrides = { a: { category: "X" }, b: { category: "Y" } };
+  assert.deepEqual(pruneOverrides(overrides, ["a"]), { a: { category: "X" } });
 });
