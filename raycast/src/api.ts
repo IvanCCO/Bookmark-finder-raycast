@@ -10,6 +10,8 @@ export interface Link {
   description: string;
   category: string;
   edited: boolean;
+  /** A IA não soube dizer o que é e o usuário ainda não explicou: sem categoria nem descrição. */
+  untagged: boolean;
   needsInput: boolean;
 }
 

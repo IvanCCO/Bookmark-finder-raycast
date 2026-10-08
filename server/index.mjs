@@ -6,7 +6,7 @@ import { config } from "./config.mjs";
 import { readJson, writeJson } from "./store.mjs";
 import { readOverrides, renameCategory, setOverride, toPublicLink } from "./overrides.mjs";
 import { expandDescription } from "./pipeline/describe.mjs";
-import { FALLBACK_CATEGORY } from "./pipeline/categorize.mjs";
+import { FALLBACK_CATEGORY, assignCategories } from "./pipeline/categorize.mjs";
 import { sync, syncState } from "./pipeline/sync.mjs";
 import { search } from "./search.mjs";
 import { watchBrowsers } from "./watch.mjs";
@@ -44,7 +44,7 @@ const routes = {
     return search(String(query ?? ""), pool);
   },
 
-  "POST /api/sync": ({ recluster }) => sync({ recluster: Boolean(recluster) }),
+  "POST /api/sync": ({ recluster, regenerate }) => sync({ recluster: Boolean(recluster), regenerate: Boolean(regenerate) }),
 
   /** Edita um link: categoria, descrição própria ou "descrição simples" para a IA expandir. */
   "POST /api/links/update": async ({ id, category, newCategory, description, simple }) => {
@@ -60,8 +60,16 @@ const routes = {
         writeJson("categories.json", [...categories, { name: chosen, description: chosen }]);
       }
     }
-    if (simple?.trim()) Object.assign(patch, pick(await expandDescription(link, simple.trim()), ["description", "keywords"]));
-    else if (description?.trim()) patch.description = description.trim();
+    if (simple?.trim()) {
+      const expanded = await expandDescription(link, simple.trim());
+      Object.assign(patch, pick(expanded, ["description", "keywords"]));
+      // Sem categoria escolhida pelo usuário, o Jev decide agora que a descrição existe.
+      if (!patch.category) {
+        const categories = readJson("categories.json", []);
+        const decided = await assignCategories([{ ...link, ...expanded }], categories);
+        patch.category = decided.get(link.id)?.category;
+      }
+    } else if (description?.trim()) patch.description = description.trim();
 
     setOverride(id, patch);
     return publicLinks().find((l) => l.id === id);

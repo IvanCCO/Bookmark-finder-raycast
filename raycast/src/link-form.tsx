@@ -57,11 +57,12 @@ export function LinkForm({ link, onSaved }: Props) {
         id="simple"
         title="O que é isso?"
         placeholder="Ex.: planilha onde controlo os clientes e os pagamentos"
-        info="Escreva do seu jeito, em poucas palavras. A IA transforma numa descrição completa."
+        info="Escreva do seu jeito, em poucas palavras (ou dite com fn fn). A IA transforma numa descrição completa e escolhe a categoria."
       />
       <Form.Checkbox id="expand" label="Gerar a descrição completa com IA a partir do que escrevi" defaultValue />
       <Form.Separator />
       <Form.Dropdown id="category" title="Categoria" defaultValue={link.category}>
+        {!link.category && <Form.Dropdown.Item value="" title="Deixar a IA escolher" />}
         {categories.map((c) => (
           <Form.Dropdown.Item key={c.name} value={c.name} title={c.name} />
         ))}

@@ -9,6 +9,7 @@
     "start": "node --env-file=.env server/index.mjs",
     "sync": "node --env-file=.env server/cli.mjs sync",
     "recluster": "node --env-file=.env server/cli.mjs recluster",
+    "regenerate": "node --env-file=.env server/cli.mjs regenerate",
     "status": "node --env-file=.env server/cli.mjs status",
     "test": "node --test \"tests/*.test.mjs\""
   }

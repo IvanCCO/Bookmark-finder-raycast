@@ -10,6 +10,11 @@ test("edição do usuário vence a IA e tira o link da fila de revisão", () => 
   assert.deepEqual([edited.description, edited.category, edited.needsInput, edited.edited], ["Minha descrição", "Trabalho", false, true]);
 });
 
+test("link que a IA não identificou aparece sem tag, sem palpite de categoria ou descrição", () => {
+  const view = toPublicLink(link, {});
+  assert.deepEqual([view.untagged, view.category, view.description], [true, "", ""]);
+});
+
 test("renomear uma categoria atualiza links e edições", () => {
   const state = {
     categories: [{ name: "Educação", description: "" }],

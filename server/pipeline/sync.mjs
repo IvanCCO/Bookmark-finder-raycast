@@ -16,10 +16,10 @@ export function sync(options = {}) {
   return inFlight;
 }
 
-async function run({ recluster = false } = {}) {
+async function run({ recluster = false, regenerate = false } = {}) {
   syncState.running = true;
   try {
-    const result = await syncOnce({ recluster });
+    const result = await syncOnce({ recluster, regenerate });
     syncState.lastResult = result;
     return result;
   } finally {
@@ -28,7 +28,7 @@ async function run({ recluster = false } = {}) {
   }
 }
 
-async function syncOnce({ recluster }) {
+async function syncOnce({ recluster, regenerate }) {
   const { links: found, errors } = await readBrowsers(config.browsers);
   const stored = new Map(readJson("links.json", []).map((l) => [l.id, l]));
 
@@ -42,6 +42,12 @@ async function syncOnce({ recluster }) {
     byId.set(id, { ...stored.get(id), ...link, id });
   }
   const links = [...byId.values()];
+  if (regenerate) {
+    // Refaz descrição e categoria de todos, sem rebuscar as páginas. Edições do usuário ficam intactas.
+    for (const link of links) {
+      for (const key of ["description", "keywords", "clear", "category", "categoryConfidence"]) delete link[key];
+    }
+  }
   const added = links.filter((l) => !stored.has(l.id)).length;
   const removed = [...stored.keys()].filter((id) => !byId.has(id)).length;
   const aiErrors = [];
@@ -61,8 +67,10 @@ async function syncOnce({ recluster }) {
 /** Metadados da página + descrição escrita pela IA, para links nunca processados. */
 async function enrich(fresh) {
   if (fresh.length === 0) return;
-  const metadata = await fetchMetadataMany(fresh.map((l) => l.url));
-  for (const link of fresh) link.meta = metadata.get(link.url);
+  // Reaproveita metadados já buscados (ex.: ao regenerar descrições).
+  const needMeta = fresh.filter((l) => !l.meta);
+  const metadata = await fetchMetadataMany(needMeta.map((l) => l.url));
+  for (const link of needMeta) link.meta = metadata.get(link.url);
 
   const described = await describeLinks(fresh);
   for (const link of fresh) Object.assign(link, described.get(link.id), { addedAt: new Date().toISOString() });
@@ -75,7 +83,9 @@ async function categorize(links, recluster) {
     categories = await proposeCategories(links);
     writeJson("categories.json", categories);
   }
-  const pending = recluster ? links : links.filter((l) => !l.category);
+  // Links que a IA não soube identificar ficam sem tag até o usuário explicar o que são.
+  const identified = links.filter((l) => l.clear !== false);
+  const pending = recluster ? identified : identified.filter((l) => !l.category);
   const assigned = await assignCategories(pending, categories);
   for (const link of pending) {
     const result = assigned.get(link.id);

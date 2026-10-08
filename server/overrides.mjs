@@ -12,10 +12,15 @@ export function setOverride(id, patch) {
   writeJson(FILE, all);
 }
 
-/** Aplica as edições do usuário a um link e devolve o formato público (o que a API entrega). */
+/**
+ * Aplica as edições do usuário a um link e devolve o formato público (o que a API entrega).
+ *
+ * Link "sem tag": a IA não soube dizer o que é e o usuário ainda não explicou. Em vez de mostrar um
+ * palpite, ele aparece sem categoria nem descrição, pedindo para ser tagueado.
+ */
 export function toPublicLink(link, overrides) {
   const edit = overrides[link.id] ?? {};
-  const description = edit.description ?? link.description ?? "";
+  const untagged = link.clear === false && !edit.description;
   return {
     id: link.id,
     browser: link.browser,
@@ -23,13 +28,13 @@ export function toPublicLink(link, overrides) {
     folder: link.folder,
     title: link.title,
     url: link.url,
-    description,
-    keywords: edit.keywords ?? link.keywords ?? "",
-    category: edit.category ?? link.category ?? "",
+    description: untagged ? "" : (edit.description ?? link.description ?? ""),
+    keywords: untagged ? "" : (edit.keywords ?? link.keywords ?? ""),
+    category: untagged ? "" : (edit.category ?? link.category ?? ""),
     categoryConfidence: link.categoryConfidence ?? 0,
     edited: Boolean(edit.category || edit.description),
-    // Precisa da sua ajuda: a IA não soube dizer o que é e você ainda não explicou.
-    needsInput: link.clear === false && !edit.description,
+    untagged,
+    needsInput: untagged,
   };
 }
 

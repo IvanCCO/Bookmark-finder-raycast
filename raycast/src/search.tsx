@@ -28,6 +28,7 @@ export default function Command() {
 
   const { data: links } = useFetch<Link[]>(`${serverUrl()}/api/links`);
   const { data: categories } = useFetch<Category[]>(`${serverUrl()}/api/categories`);
+  const untaggedCount = (links ?? []).filter((l) => l.untagged).length;
   const spaces = [...new Set((links ?? []).map((l) => l.space))];
 
   const { data, isLoading, error, revalidate } = useFetch<{ ms: number; results: SearchResult[] }>(
@@ -78,37 +79,51 @@ export default function Command() {
           description="Ex.: artigos sobre IA na educação"
         />
       ) : (
-        results.map((r) => (
-          <List.Item
-            key={r.id}
-            icon={getFavicon(r.url, { fallback: Icon.Link })}
-            title={r.title}
-            subtitle={r.description}
-            accessories={[
-              {
-                tag: { value: r.category || "Sem categoria", color: categoryColor(r.category) },
-                tooltip: [r.space, r.folder].filter(Boolean).join(" / "),
-              },
-              { tag: { value: `${Math.round(r.p * 100)}%`, color: r.p >= 0.6 ? Color.Green : Color.SecondaryText } },
-            ]}
-            actions={
-              <ActionPanel>
-                <Action.OpenInBrowser title="Abrir" url={r.url} />
-                <Action.CopyToClipboard
-                  title="Copiar URL"
-                  content={r.url}
-                  shortcut={{ modifiers: ["cmd"], key: "c" }}
-                />
-                <Action.Push
-                  title="Editar Categoria E Descrição"
-                  icon={Icon.Pencil}
-                  shortcut={Keyboard.Shortcut.Common.Edit}
-                  target={<LinkForm link={r} onSaved={revalidate} />}
-                />
-              </ActionPanel>
-            }
-          />
-        ))
+        results.map((r) => {
+          const tag = (
+            <Action.Push
+              key="tag"
+              title={r.untagged ? "Taguear (Explicar O Que É)" : "Editar Categoria E Descrição"}
+              icon={r.untagged ? Icon.Tag : Icon.Pencil}
+              shortcut={r.untagged ? undefined : { modifiers: ["cmd"], key: "e" }}
+              target={<LinkForm link={r} onSaved={revalidate} />}
+            />
+          );
+          return (
+            <List.Item
+              key={r.id}
+              icon={getFavicon(r.url, { fallback: Icon.Link })}
+              title={r.title}
+              subtitle={r.untagged ? "Sem tag: não deu para saber o que é. Enter para explicar." : r.description}
+              accessories={[
+                r.untagged
+                  ? {
+                      tag: { value: "Sem tag", color: Color.Orange },
+                      icon: Icon.Warning,
+                      tooltip: "Explique o que é para a IA taguear",
+                    }
+                  : {
+                      tag: { value: r.category || "Outros", color: categoryColor(r.category) },
+                      tooltip: [r.space, r.folder].filter(Boolean).join(" / "),
+                    },
+                { tag: { value: `${Math.round(r.p * 100)}%`, color: r.p >= 0.6 ? Color.Green : Color.SecondaryText } },
+              ]}
+              actions={
+                <ActionPanel>
+                  {/* Para link sem tag, a primeira ação (Enter) é taguear. */}
+                  {r.untagged && tag}
+                  <Action.OpenInBrowser title="Abrir" url={r.url} />
+                  <Action.CopyToClipboard
+                    title="Copiar URL"
+                    content={r.url}
+                    shortcut={{ modifiers: ["cmd"], key: "c" }}
+                  />
+                  {!r.untagged && tag}
+                </ActionPanel>
+              }
+            />
+          );
+        })
       )}
     </List>
   );
