@@ -12,6 +12,12 @@ export function setOverride(id, patch) {
   writeJson(FILE, all);
 }
 
+/** Remove as edições de links que não existem mais (o favorito foi tirado do navegador). */
+export function pruneOverrides(overrides, existingIds) {
+  const ids = new Set(existingIds);
+  return Object.fromEntries(Object.entries(overrides).filter(([id]) => ids.has(id)));
+}
+
 /**
  * Aplica as edições do usuário a um link e devolve o formato público (o que a API entrega).
  *
