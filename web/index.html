@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arc Finder</title>
+<style>
+  :root { --bg:#f2f2f4; --card:#fcfcfd; --ink:#1d1d1f; --muted:#86868b; --line:#e3e3e8; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#16161a; --card:#202026; --ink:#f5f5f7; --muted:#8e8e93; --line:#2c2c33; } }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; overflow:hidden; background:var(--bg); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif; }
+  #spaces { position:fixed; top:20px; left:50%; transform:translateX(-50%); display:flex; gap:6px; z-index:5; flex-wrap:wrap; justify-content:center; padding:0 16px; }
+  #spaces button { border:1px solid var(--line); background:transparent; color:var(--muted); border-radius:999px; padding:6px 14px; font:inherit; font-size:13px; cursor:pointer; }
+  #spaces button[aria-pressed="true"] { background:var(--card); color:var(--ink); box-shadow:0 1px 4px rgba(0,0,0,.08); }
+  #box { position:fixed; top:16vh; left:50%; transform:translateX(-50%); width:min(720px, calc(100vw - 32px)); z-index:5; }
+  #box input { width:100%; border:0; outline:0; background:var(--card); color:var(--ink); font:inherit; font-size:28px; padding:26px 64px 26px 32px; border-radius:28px; box-shadow:0 8px 30px rgba(0,0,0,.08), 0 1px 3px rgba(0,0,0,.06); }
+  #box input::placeholder { color:var(--muted); }
+  #clear { position:absolute; right:26px; top:50%; transform:translateY(-50%); border:0; background:none; color:var(--muted); font-size:22px; cursor:pointer; display:none; }
+  #status { position:absolute; left:32px; top:calc(100% + 10px); font-size:12px; color:var(--muted); }
+  #caption { position:fixed; left:50%; transform:translateX(-50%); width:min(560px, calc(100vw - 32px)); text-align:center; z-index:6; pointer-events:none; opacity:0; }
+  #caption b { display:block; font-size:15px; font-weight:600; }
+  #caption span { display:block; font-size:13px; color:var(--muted); margin-top:3px; }
+  #caption i { font-style:normal; font-size:12px; color:var(--muted); }
+  .ic { position:fixed; left:0; top:0; width:44px; height:44px; margin:-22px 0 0 -22px; border-radius:12px; background:var(--card); box-shadow:0 1px 4px rgba(0,0,0,.15); display:grid; place-items:center; cursor:pointer; will-change:transform; user-select:none; }
+  .ic img { width:28px; height:28px; border-radius:6px; pointer-events:none; -webkit-user-drag:none; }
+  .ic.hit { z-index:7; }
+</style>
+</head>
+<body>
+<div id="spaces" role="group" aria-label="Spaces do Arc"></div>
+<div id="box">
+  <input id="q" autofocus autocomplete="off" spellcheck="false" placeholder="O que você procura? (Enter para buscar)">
+  <button id="clear" aria-label="Limpar">×</button>
+  <div id="status"></div>
+</div>
+<div id="caption"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.20.0/matter.min.js"></script>
+<script type="module">
+import { animate } from "https://cdn.jsdelivr.net/npm/motion@12/+esm";
+
+const { Engine, Bodies, Composite, Body, Sleeping } = Matter;
+const R = 22;
+const $ = (s) => document.querySelector(s);
+const q = $("#q"), statusEl = $("#status"), caption = $("#caption"), clearBtn = $("#clear");
+
+// Sleeping + mais iterações do solver param a tremedeira dos itens empilhados no chão.
+const engine = Engine.create({ gravity: { y: 1.1 }, enableSleeping: true, positionIterations: 12, velocityIterations: 10 });
+const wakeAll = () => Composite.allBodies(engine.world).forEach((b) => !b.isStatic && Sleeping.set(b, false));
+let all = [], space = "", items = [], walls = [];
+let searchSeq = 0;
+
+const favicon = (u) => { try { return `https://www.google.com/s2/favicons?domain=${new URL(u).hostname}&sz=64`; } catch { return ""; } };
+
+function buildWalls() {
+  Composite.remove(engine.world, walls);
+  const w = innerWidth, h = innerHeight, t = 200;
+  walls = [
+    Bodies.rectangle(w / 2, h + t / 2 - 2, w + 2 * t, t, { isStatic: true }),
+    Bodies.rectangle(-t / 2, h / 2, t, h * 4, { isStatic: true }),
+    Bodies.rectangle(w + t / 2, h / 2, t, h * 4, { isStatic: true }),
+  ];
+  Composite.add(engine.world, walls);
+}
+
+function drop(it, x, y) {
+  it.mode = "physics";
+  it.body = Bodies.circle(x ?? R + Math.random() * (innerWidth - 2 * R), y ?? -R - Math.random() * 600, R - 2, { restitution: 0.05, friction: 0.6, frictionStatic: 1, frictionAir: 0.02, slop: 0.05, sleepThreshold: 40 });
+  Body.setAngle(it.body, Math.random() * Math.PI * 2);
+  Composite.add(engine.world, it.body);
+}
+
+function mount() {
+  items.forEach((it) => { it.el.remove(); if (it.body) Composite.remove(engine.world, it.body); });
+  items = all.filter((l) => !space || l.space === space).map((l, i) => {
+    const el = document.createElement("div");
+    el.className = "ic";
+    el.innerHTML = `<img alt="" src="${favicon(l.url)}">`;
+    el.addEventListener("click", () => window.open(l.url, "_blank", "noopener"));
+    el.addEventListener("mouseenter", () => showCaption(it));
+    document.body.append(el);
+    const it = { link: l, el, mode: "physics", x: 0, y: 0, a: 0, s: 1 };
+    setTimeout(() => drop(it), i * 12); // cai em fluxo, não tudo de uma vez
+    return it;
+  });
+}
+
+function render() {
+  for (const it of items) {
+    if (it.mode === "physics" && it.body) { it.x = it.body.position.x; it.y = it.body.position.y; it.a = it.body.angle; }
+    if (it.mode === "physics" && !it.body) { it.el.style.visibility = "hidden"; continue; }
+    it.el.style.visibility = "visible";
+    it.el.style.transform = `translate(${it.x}px, ${it.y}px) rotate(${it.a}rad) scale(${it.s})`;
+  }
+}
+// Passo fixo de 1/60s: delta variável deixa a física instável.
+const STEP = 1000 / 60;
+let last = performance.now(), acc = 0;
+(function loop(now) {
+  acc = Math.min(acc + now - last, 100); last = now;
+  while (acc >= STEP) { Engine.update(engine, STEP); acc -= STEP; }
+  render();
+  requestAnimationFrame(loop);
+})(last);
+
+/* ---------- busca ---------- */
+function showCaption(it) {
+  const r = $("#box").getBoundingClientRect();
+  const p = it.p != null ? ` · ${Math.round(it.p * 100)}%` : "";
+  caption.innerHTML = `<b></b><span></span><i>${it.link.folder ? it.link.folder : ""}${p}</i>`;
+  caption.querySelector("b").textContent = it.link.title;
+  caption.querySelector("span").textContent = it.link.description ?? "";
+  caption.style.top = `${r.bottom + 150}px`;
+  animate(caption, { opacity: 1 }, { duration: 0.2 });
+}
+
+function release(opts = {}) {
+  for (const it of items) {
+    if (it.mode !== "hit") continue;
+    it.el.classList.remove("hit");
+    animate(it.s, 1, { duration: 0.2, onUpdate: (v) => (it.s = v) });
+    drop(it, it.x, it.y); // volta a cair da posição onde estava
+    it.p = null;
+  }
+  if (!opts.keepCaption) animate(caption, { opacity: 0 }, { duration: 0.15 });
+}
+
+function lift(results) {
+  const r = $("#box").getBoundingClientRect();
+  const hits = results.map(({ id, p }) => ({ it: items.find((i) => i.link.id === id), p })).filter((h) => h.it);
+  const gap = 66, perRow = Math.max(1, Math.floor((innerWidth - 80) / gap));
+  hits.forEach(({ it, p }, n) => {
+    const row = Math.floor(n / perRow), inRow = Math.min(perRow, hits.length - row * perRow);
+    const tx = innerWidth / 2 + (n % perRow - (inRow - 1) / 2) * gap;
+    const ty = r.bottom + 60 + row * gap;
+    if (it.body) { Composite.remove(engine.world, it.body); it.body = null; wakeAll(); }
+    it.mode = "hit"; it.p = p;
+    it.el.classList.add("hit");
+    const delay = n * 0.045;
+    const spring = { type: "spring", stiffness: 160, damping: 15, delay };
+    animate(it.x, tx, { ...spring, onUpdate: (v) => (it.x = v) });
+    animate(it.y, ty, { ...spring, onUpdate: (v) => (it.y = v) });
+    animate(it.a, 0, { ...spring, onUpdate: (v) => (it.a = v) });
+    animate(it.s, 1.35, { ...spring, onUpdate: (v) => (it.s = v) });
+  });
+  if (hits[0]) showCaption(hits[0].it);
+}
+
+async function search() {
+  const text = q.value.trim();
+  const seq = ++searchSeq;
+  release({ keepCaption: !!text });
+  if (!text) { statusEl.textContent = ""; return; }
+  statusEl.textContent = "buscando…";
+  try {
+    const res = await fetch("/api/search", { method: "POST", body: JSON.stringify({ query: text, space }) });
+    const json = await res.json();
+    if (seq !== searchSeq) return; // o usuário digitou de novo
+    if (!res.ok) throw new Error(json.error);
+    const top = json.results[0]?.p ?? 0; // corte relativo: descarta o que está muito abaixo do melhor
+    const results = json.results.filter((x) => x.p >= Math.max(0.25, top * 0.5));
+    statusEl.textContent = results.length ? `${results.length} candidatos · ${json.ms} ms` : `nada parecido · ${json.ms} ms`;
+    lift(results);
+  } catch (e) {
+    statusEl.textContent = "erro: " + e.message;
+  }
+}
+
+// A busca só acontece no Enter. Digitar apenas atualiza o botão de limpar.
+function onInput() {
+  clearBtn.style.display = q.value ? "block" : "none";
+  if (!q.value.trim()) { searchSeq++; release(); statusEl.textContent = ""; }
+}
+q.addEventListener("input", onInput);
+q.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) search(); });
+clearBtn.addEventListener("click", () => { q.value = ""; onInput(); q.focus(); });
+
+/* ---------- spaces ---------- */
+function renderSpaces() {
+  const names = ["", ...new Set(all.map((l) => l.space))];
+  const box = $("#spaces");
+  box.innerHTML = "";
+  for (const n of names) {
+    const b = document.createElement("button");
+    b.textContent = n || "Todos";
+    b.setAttribute("aria-pressed", String(n === space));
+    b.onclick = () => { space = n; q.value = ""; onInput(); renderSpaces(); mount(); };
+    box.append(b);
+  }
+}
+
+addEventListener("resize", buildWalls);
+buildWalls();
+all = await (await fetch("/api/links")).json();
+space = "BRIO";
+renderSpaces();
+mount();
+</script>
+</body>
+</html>

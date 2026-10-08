@@ -1,0 +1,72 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "bookmark-finder",
+  "title": "Bookmark Finder",
+  "description": "Encontre favoritos e itens fixos do navegador descrevendo o que procura. Descrições e categorias geradas por IA.",
+  "icon": "extension-icon.png",
+  "author": "ivancco",
+  "platforms": [
+    "macOS"
+  ],
+  "categories": [
+    "Productivity"
+  ],
+  "license": "MIT",
+  "commands": [
+    {
+      "name": "search",
+      "title": "Buscar Favoritos",
+      "subtitle": "Bookmark Finder",
+      "description": "Encontra o que você salvou descrevendo o que procura.",
+      "mode": "view"
+    },
+    {
+      "name": "review",
+      "title": "Revisar Links",
+      "subtitle": "Bookmark Finder",
+      "description": "Links que a IA não soube identificar: explique o que são em poucas palavras.",
+      "mode": "view"
+    },
+    {
+      "name": "categories",
+      "title": "Gerenciar Categorias",
+      "subtitle": "Bookmark Finder",
+      "description": "Renomeie, mescle ou reagrupe as categorias criadas pela IA.",
+      "mode": "view"
+    },
+    {
+      "name": "sync",
+      "title": "Sincronizar Favoritos",
+      "subtitle": "Bookmark Finder",
+      "description": "Lê o navegador agora e processa os links novos.",
+      "mode": "no-view"
+    }
+  ],
+  "preferences": [
+    {
+      "name": "serverUrl",
+      "type": "textfield",
+      "required": false,
+      "title": "URL do servidor",
+      "description": "Endereço do servidor local do Bookmark Finder.",
+      "default": "http://127.0.0.1:5174"
+    }
+  ],
+  "dependencies": {
+    "@raycast/api": "^1.100.0",
+    "@raycast/utils": "^1.19.0"
+  },
+  "devDependencies": {
+    "@raycast/eslint-config": "^2.0.4",
+    "@types/node": "22.13.10",
+    "@types/react": "19.0.10",
+    "eslint": "^9.22.0",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.2"
+  },
+  "scripts": {
+    "build": "ray build -e dist",
+    "dev": "ray develop",
+    "lint": "ray lint"
+  }
+}
